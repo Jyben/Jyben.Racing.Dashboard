@@ -1,0 +1,42 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 25.0.1705.2
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jyben.Racing.Dashboard.Server", "Jyben.Racing.Dashboard\Server\Jyben.Racing.Dashboard.Server.csproj", "{DABCDF05-1B70-4AB0-A726-0A04E700C56B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jyben.Racing.Dashboard.Client", "Jyben.Racing.Dashboard\Client\Jyben.Racing.Dashboard.Client.csproj", "{C32CF0EC-45E3-4A53-A1DD-3309215210A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Jyben.Racing.Dashboard.Shared", "Jyben.Racing.Dashboard\Shared\Jyben.Racing.Dashboard.Shared.csproj", "{F37C0A79-EFBB-4C5E-BF2B-D9B97E9DCC42}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Éléments de solution", "Éléments de solution", "{6AB1F7FE-52C4-4C4A-B78A-2A5A7AE122BA}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DABCDF05-1B70-4AB0-A726-0A04E700C56B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DABCDF05-1B70-4AB0-A726-0A04E700C56B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DABCDF05-1B70-4AB0-A726-0A04E700C56B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DABCDF05-1B70-4AB0-A726-0A04E700C56B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C32CF0EC-45E3-4A53-A1DD-3309215210A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C32CF0EC-45E3-4A53-A1DD-3309215210A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C32CF0EC-45E3-4A53-A1DD-3309215210A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C32CF0EC-45E3-4A53-A1DD-3309215210A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F37C0A79-EFBB-4C5E-BF2B-D9B97E9DCC42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F37C0A79-EFBB-4C5E-BF2B-D9B97E9DCC42}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F37C0A79-EFBB-4C5E-BF2B-D9B97E9DCC42}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F37C0A79-EFBB-4C5E-BF2B-D9B97E9DCC42}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D51D9DDE-5B2D-44CA-BE87-5D2F6CAA9DB2}
+	EndGlobalSection
+EndGlobal

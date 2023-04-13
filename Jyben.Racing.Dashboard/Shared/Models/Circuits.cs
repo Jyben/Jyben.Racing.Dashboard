@@ -8,8 +8,38 @@ namespace Jyben.Racing.Dashboard.Shared.Models
         [JsonPropertyName("nom")]
         public string Nom { get; set; }
 
-        [JsonPropertyName("zone")]
+        [JsonPropertyName("image")]
+        public string Image { get; set; }
+
+        [JsonPropertyName("canevas")]
+        public Canevas Canevas { get; set; }
+
+        [JsonPropertyName("zones")]
         public List<Zone> Zone { get; set; }
+    }
+
+    public class Canevas
+    {
+        [JsonPropertyName("width")]
+        public long Width { get; set; }
+
+        [JsonPropertyName("height")]
+        public long Height { get; set; }
+
+        [JsonPropertyName("top-left")]
+        public CoordGPS TopLeft { get; set; }
+
+        [JsonPropertyName("bottom-right")]
+        public CoordGPS BottomRight { get; set; }
+    }
+
+    public class CoordGPS
+    {
+        [JsonPropertyName("longitude")]
+        public double Longitude { get; set; }
+
+        [JsonPropertyName("latitude")]
+        public double Latitude { get; set; }
     }
 
     public class Coord

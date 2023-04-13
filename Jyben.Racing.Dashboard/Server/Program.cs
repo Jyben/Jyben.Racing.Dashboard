@@ -1,4 +1,7 @@
 ﻿using Jyben.Racing.Dashboard.Server.Hubs;
+using Jyben.Racing.Dashboard.Server.Services;
+using Jyben.Racing.Dashboard.Server.Services.Impl;
+using Jyben.Racing.Dashboard.Shared.Models;
 using Microsoft.AspNetCore.ResponseCompression;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +16,13 @@ builder.Services.AddResponseCompression(opts =>
         new[] { "application/octet-stream" });
 });
 builder.Services.AddSignalR();
+
+builder.Services.Configure<RacingDatabaseSettings>(
+    builder.Configuration.GetSection("RacingDatabase"));
+
+builder.Services.AddSingleton<ITelemetrieService, TelemetrieService>();
+builder.Services.AddSingleton<ICircuitsService, CircuitsService>();
+builder.Services.AddSingleton<IPiloteService, PiloteService>();
 
 var app = builder.Build();
 

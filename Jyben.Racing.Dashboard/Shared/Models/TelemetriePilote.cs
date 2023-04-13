@@ -1,12 +1,11 @@
-﻿using System;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Jyben.Racing.Dashboard.Shared.Models
 {
-    public class TelemetryPilote
+    public class TelemetriePilote
     {
         [JsonPropertyName("id")]
-        public int Id { get; set; }
+        public string? Id { get; set; }
 
         [JsonPropertyName("nom")]
         public string Nom { get; set; }

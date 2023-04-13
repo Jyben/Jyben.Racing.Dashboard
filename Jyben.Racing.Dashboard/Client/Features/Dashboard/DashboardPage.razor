@@ -1,7 +1,54 @@
-﻿@page "/dashboard"
+﻿@page "/"
 
 @using Blazor.Extensions.Canvas
 
-<div style="background-image: url('img/cik.png');background-size:contain;border: 1px solid black; height: 600px; width: 400px">
-    <BECanvas @ref="@_canvasReference" Height="600" Width="400"></BECanvas>
+<div style="text-align: left;">
+    <select @onchange="@PiloteMisAJour" style="display: inline-block;" class="form-select">
+        @foreach (var pilote in _pilotes)
+        {
+            <option value="@pilote.Id">@pilote.Nom</option>
+        }
+    </select>
+    <button style="display: inline-block;" class=@($"btn {_classBtn}") @onclick="@BasculerTelemetrie">@_etatTelemetrie</button>
 </div>
+<br />
+
+@if (_circuit != null)
+{
+    <div style=@($"background-image: url('{_circuit.Image}');background-size:contain;border: 1px solid black; height: {_circuit.Canevas.Height}px; width: {_circuit.Canevas.Width}px")>
+        <BECanvas @ref="@_canvasReference" Height=@_circuit.Canevas.Height Width=@_circuit.Canevas.Width></BECanvas>
+    </div>
+}
+
+<br />
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Tour</th>
+            <th>S1</th>
+            <th>S2</th>
+            <th>S3</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (_telemetrie is not null)
+        {
+            @foreach (var telemetrie in _telemetrie.Tours)
+            {
+                if (telemetrie is not null)
+                {
+                    <tr>
+                        <td>@telemetrie.NumTour</td>
+                        <td>@telemetrie.Temps</td>
+                        <td>@telemetrie.Secteurs.FirstOrDefault(x => x.NumSecteur == 1)?.Temps</td>
+                        <td>@telemetrie.Secteurs.FirstOrDefault(x => x.NumSecteur == 2)?.Temps</td>
+                        <td>@telemetrie.Secteurs.FirstOrDefault(x => x.NumSecteur == 3)?.Temps</td>
+                    </tr>
+                }
+            }
+        }
+
+    </tbody>
+</table>

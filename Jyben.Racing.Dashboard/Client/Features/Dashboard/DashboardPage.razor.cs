@@ -1,14 +1,16 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Blazor.Extensions;
 using Blazor.Extensions.Canvas.Canvas2D;
 using Jyben.Racing.Dashboard.Client.Helpers;
+using Jyben.Racing.Dashboard.Shared.Enums;
+using Jyben.Racing.Dashboard.Shared.Helpers;
 using Jyben.Racing.Dashboard.Shared.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
+using SharpCompress.Common;
 
 namespace Jyben.Racing.Dashboard.Client.Features.Dashboard
 {
@@ -17,288 +19,306 @@ namespace Jyben.Racing.Dashboard.Client.Features.Dashboard
 		[Inject] public NavigationManager NavigationManager { get; set; }
         [Inject] public HttpClient HttpClient { get; set; }
 
-        private HubConnection? hubConnection;
-		private Dictionary<int, TelemetryDto> _telemetryKvp = new();
-		private List<Zone>? _zones;
-        private static string _filePathCircuits = "/circuits.json";
+        private HubConnection? _hubConnection;
         private Canvas2DContext _context;
         protected BECanvasComponent _canvasReference;
-        private static double _minDistance = 10;
         private GpsToPixelConverter _gpsToPixelConverter;
+        private Circuit _circuit;
+        private bool _isDisposed;
+        private List<Pilote> _pilotes = new() { new Pilote() { Nom = "Sélectionner le pilote" } };
+        private Pilote _pilote = new();
+        private string _etatTelemetrie = "Démarrer";
+        private string _classBtn = "btn-primary";
+        private Telemetrie? _telemetrie;
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            _context = await _canvasReference.CreateCanvas2DAsync();
+            if (_canvasReference != null)
+            {
+                _context = await _canvasReference.CreateCanvas2DAsync();
+            }
         }
 
+        /// <summary>
+        /// Lecture des données via l'api et récéption des données via les events SignalR.
+        /// </summary>
+        /// <returns></returns>
         protected override async Task OnInitializedAsync()
 		{
             try
             {
-                var result = await HttpClient.GetFromJsonAsync<CircuitsDto>("circuits.json");
-                _zones = result?.Circuits.First(x => x.Nom == "cik").Zone;
+                var result = await HttpClient.GetFromJsonAsync<CircuitsDto>("api/cirtcuits");
+
+                ArgumentNullException.ThrowIfNull(result);
+
+                _circuit = result.Circuits.First(x => x.Nom == "cik");
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Une erreur est survenue lors de la désérialisation du fichier JSON : {0}", ex.Message);
             }
 
-            hubConnection = new HubConnectionBuilder()
+            try
+            {
+                var pilotes = await HttpClient.GetFromJsonAsync<List<Pilote>>("api/pilotes");
+
+                if (pilotes is not null && pilotes.Any())
+                {
+                    _pilotes = pilotes;
+                    _pilote = _pilotes.First();
+                    await LireTelemetrie();
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+
+            _hubConnection = new HubConnectionBuilder()
 				.WithUrl(NavigationManager.ToAbsoluteUri("/signalr/telemetry"))
 				.Build();
 
-			hubConnection.On<int, string>("RecevoirTelemetry", async (userId, json) =>
-			{
-                Console.WriteLine(json);
+            // réceptionne la télémétrie des pilotes
+            _hubConnection.On("RecevoirTelemetry", (Func<string, Task>)(async (json) =>
+            {
+                await RecevoirTelemetrie(json);
+            }));
 
-                try
-                {
-				    var telemetryPilote = JsonSerializer.Deserialize<TelemetryPilote>(json);
-                    ArgumentNullException.ThrowIfNull(telemetryPilote);
+            // réceptionne les noms et ids des pilotes
+            _hubConnection.On("RecevoirPilote", (Action<string>)((piloteJson) =>
+            {
+                RecevoirPilote(piloteJson);
+            }));
 
-				    MettreAJourTelemetry(telemetryPilote);
+            // réceptionne l'information que le pilote est dans un nouveau tour
+            _hubConnection.On("RecevoirInfoNouveauTour", (Action)(async () =>
+            {
+                // nettoie les traces affichées
+                await _context.ClearRectAsync(0, 0, _circuit.Canevas.Width, _circuit.Canevas.Height);
+            }));
 
-                    var telemetry = _telemetryKvp.FirstOrDefault(x => x.Key == telemetryPilote.Id);
-                    if (telemetry.Value != null && telemetry.Value.Traces != null)
-                    {
-                        await DrawCanevas(telemetry.Value.Traces);
-                        StateHasChanged();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
-			});
+            await _hubConnection.StartAsync();
 
-			await hubConnection.StartAsync();
-
-            _gpsToPixelConverter = new(400, 600, 0.210903, 47.943942, 0.213743, 47.941083);
+            _gpsToPixelConverter = new(_circuit.Canevas.Width,
+                _circuit.Canevas.Height,
+                _circuit.Canevas.TopLeft.Longitude,
+                _circuit.Canevas.TopLeft.Latitude,
+                _circuit.Canevas.BottomRight.Longitude,
+                _circuit.Canevas.BottomRight.Latitude);
         }
 
-        private async Task DrawCanevas(List<Trace> traces)
+        /// <summary>
+        /// Est appelé lorsque l'utilisateur change de pilote dans la select box.
+        /// </summary>
+        /// <param name="e"></param>
+        /// <returns></returns>
+        private async Task PiloteMisAJour(ChangeEventArgs e)
+        {
+            if (e.Value is null) return;
+
+            var pilote = _pilotes.FirstOrDefault(x => x.Id == e.Value.ToString());
+
+            if (pilote is null) return;
+
+            _pilote = pilote;
+
+            await LireTelemetrie();
+        }
+
+        /// <summary>
+        /// Met à jour la liste des pilotes lorsqu'un pilote est connecté via SignalR.
+        /// </summary>
+        /// <param name="piloteJson">Le json content les infos du pilote.</param>
+        private void RecevoirPilote(string piloteJson)
+        {
+            Console.WriteLine(piloteJson);
+
+            var pilote = JsonSerializer.Deserialize<Pilote>(piloteJson);
+            ArgumentNullException.ThrowIfNull(pilote);
+
+            if (_pilotes.Any(x => x.Nom == pilote.Nom))
+            {
+                _pilotes.RemoveAt(_pilotes.FindIndex(x => x.Nom == pilote.Nom));
+            }
+
+            _pilotes.Add(pilote);
+            StateHasChanged();
+        }
+
+        /// <summary>
+        /// Gère l'affichage de la télémétrie reçue.
+        /// </summary>
+        /// <param name="telemetrieJson">Le json de la télémtrie reçue</param>
+        /// <returns></returns>
+        private async Task RecevoirTelemetrie(string telemetrieJson)
+        {
+            await LireTelemetrie();
+
+            Console.WriteLine(telemetrieJson);
+
+            try
+            {
+                var telemetrie = JsonSerializer.Deserialize<Telemetrie>(telemetrieJson);
+                ArgumentNullException.ThrowIfNull(telemetrie);
+
+                var dernierTour = TelemetrieHelper.ObtenirDernierTour(telemetrie.Tours);
+                ArgumentNullException.ThrowIfNull(dernierTour);
+
+                if (dernierTour.Traces != null && dernierTour.Traces.Count > 1)
+                {
+                    await DessinerSurLeCanevas(dernierTour.Traces);
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        /// <summary>
+        /// Lire la télémétrie complète d'un pilote pour l'afficher dans le tableau des temps.
+        /// </summary>
+        /// <returns></returns>
+        private async Task LireTelemetrie()
+        {
+            if (_pilote is null || string.IsNullOrEmpty(_pilote.Nom)) return;
+
+            Telemetrie? telemetrie = null;
+            try
+            {
+                telemetrie = await HttpClient.GetFromJsonAsync<Telemetrie?>($"api/pilotes/{_pilote.Nom}/telemetries");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+
+            // on vérifie que le pilote sélectionné est bien celui en course avant de mettre à jour le tableau
+            if (telemetrie is not null && _pilote.Nom == telemetrie.Nom)
+            {
+                _telemetrie = telemetrie;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        /// <summary>
+        /// Dessine la trace du pilote.
+        /// </summary>
+        /// <param name="traces">Les coordonnées GPS du pilote.</param>
+        /// <returns></returns>
+        private async Task DessinerSurLeCanevas(List<Trace> traces)
         {
             var trace = traces.OrderByDescending(x => x.Time).First();
             var tracePrecedente = traces.OrderByDescending(x => x.Time).Skip(1).Take(1).First();
 
-            // calcul la distance depuis la dernière coordonnée GPS
-            var distance = CalculerDistance(tracePrecedente.Latitude, tracePrecedente.Longitude, trace.Latitude, trace.Longitude);
-
-            // vérifie si la distance est supérieure au seuil minimal
-            if (distance < _minDistance)
-            {
-                return;
-            }
-
+            // dessine la ligne en reliant chaque paire de coordonnées
             if (_context != null && traces.Count >= 2)
             {
-                // dessine la ligne en reliant chaque paire de coordonnées
                 await _context.BeginPathAsync();
 
                 // converti en les coordonnées GPS en pixels
-                var point = _gpsToPixelConverter.Convert(traces[traces.Count - 2].Longitude, traces[traces.Count - 2].Latitude);
+                var point = _gpsToPixelConverter.Convert(traces[^2].Longitude, traces[^2].Latitude);
                 await _context.MoveToAsync(point.X, point.Y);
-                point = _gpsToPixelConverter.Convert(traces[traces.Count - 1].Longitude, traces[traces.Count - 1].Latitude);
+                point = _gpsToPixelConverter.Convert(traces[^1].Longitude, traces[^1].Latitude);
                 await _context.LineToAsync(point.X, point.Y);
-                var couleur = "";
+
                 // personnalise l'apparence de la ligne
-                if (trace.Type == "freinage")
-                {
-                    couleur = "#FF0000";
-                }
-                else if (trace.Type == "acceleration")
-                {
-                    couleur = "#00FF00";
-                }
-                else
-                {
-                    couleur = "#FFFFFF";
-                }
+                var couleur = "";
+                couleur = DetermineCouleurAccelerationFreinage(traces[^2].Vitesse, traces[^1].Vitesse);
+
                 await _context.SetStrokeStyleAsync(couleur);
-                await _context.SetLineWidthAsync(1);
+                await _context.SetLineWidthAsync(3);
                 await _context.StrokeAsync();
             }
         }
 
-        public static double CalculerDistance(double lat1, double lon1, double lat2, double lon2)
+        /// <summary>
+        /// Détermine la couleur à partir de la vitesse actuelle et de la vitesse précédente.
+        /// </summary>
+        /// <param name="vitessePrecedente"></param>
+        /// <param name="vitesseActuelle"></param>
+        /// <returns></returns>
+        public static string DetermineCouleurAccelerationFreinage(double vitessePrecedente, double vitesseActuelle)
         {
-            const double earthRadius = 6378137.0; // Rayon de la Terre en mètres
+            double acceleration = (vitesseActuelle - vitessePrecedente);
+            string couleur = "#FFFFFF"; // Blanc pour la stabilisation
 
-            // Conversion des coordonnées en radians
-            double radLat1 = lat1 * Math.PI / 180.0;
-            double radLon1 = lon1 * Math.PI / 180.0;
-            double radLat2 = lat2 * Math.PI / 180.0;
-            double radLon2 = lon2 * Math.PI / 180.0;
-
-            // Calcul de la distance entre les deux points en utilisant la formule de Haversine
-            double dLat = radLat2 - radLat1;
-            double dLon = radLon2 - radLon1;
-            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                       Math.Cos(radLat1) * Math.Cos(radLat2) *
-                       Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-            double distance = earthRadius * c;
-
-            return distance;
-        }
-
-        private void MettreAJourTelemetry(TelemetryPilote? telemetry)
-		{
-			if (telemetry == null) return;
-
-			if (!_telemetryKvp.Any(x => x.Key == telemetry.Id))
-			{
-                // initialiser la telemetry du pilote
-                _telemetryKvp.Add(telemetry.Id, new TelemetryDto()
-                {
-                    Id = telemetry.Id,
-                    Nom = telemetry.Nom,
-                    Traces = new() { CreerTrace(telemetry.Trace) },
-                    Tours = new() { CreerNouveauTour() }
-                });
-            }
-			else
-			{
-                var telemetryKvp = _telemetryKvp.First(x => x.Key == telemetry.Id);
-                var telemetryAModifier = telemetryKvp.Value;
-
-                telemetryAModifier.Traces.Add(CreerTrace(telemetry.Trace));
-
-                VerifierNouveauSecteur(telemetry.Trace, telemetryAModifier.Tours);
-            }
-		}
-
-		private static Trace CreerTrace(Trace traceACreer)
-		{
-			traceACreer.Time = DateTime.Now;
-			return traceACreer;
-        }
-
-		private static Tour CreerNouveauTour(int? numTourPrecedent = null)
-		{
-			return new()
-			{
-				NumTour = numTourPrecedent ?? 1,
-				Secteurs = new() { CreerSecteur(numSecteurACreer: 1) }
-            };
-		}
-
-		private static Tour? ObtenirDernierTour(List<Tour> tours)
-		{
-			return tours.OrderByDescending(x => x.NumTour).FirstOrDefault();
-        }
-
-
-        private static Secteur? ObtenirDernieSecteur(List<Secteur> secteurs)
-        {
-            return secteurs.OrderByDescending(x => x.NumSecteur).FirstOrDefault();
-        }
-
-        private static string CalculerTemps(DateTime tempsAComparer)
-		{
-            TimeSpan diff = DateTime.Now - tempsAComparer;
-
-            int minutes = (int)diff.TotalMinutes;
-            int seconds = (int)diff.TotalSeconds % 60;
-            int milliseconds = diff.Milliseconds;
-
-            Console.WriteLine($"Temps secteur : {string.Format("{0}:{1:00}.{2:000}", minutes, seconds, milliseconds)}");
-
-            return string.Format("{0}:{1:00}.{2:000}", minutes, seconds, milliseconds);
-        }
-
-		private void VerifierNouveauSecteur(Trace trace, List<Tour> tours)
-        {
-            var dernierTour = ObtenirDernierTour(tours);
-            ArgumentNullException.ThrowIfNull(dernierTour);
-
-            var dernierSecteur = ObtenirDernieSecteur(dernierTour.Secteurs);
-            ArgumentNullException.ThrowIfNull(dernierSecteur);
-
-            var s1 = _zones.First(x => x.Secteur == 1);
-            var s2 = _zones.First(x => x.Secteur == 2);
-            var s3 = _zones.First(x => x.Secteur == 3); // ligne d'arrivée
-
-            // à quel secteur nous en sommes ?
-            switch (dernierSecteur.NumSecteur)
+            if (acceleration >= 5)
             {
-                case 1:
-                    if (EstSecteurDepasse(trace, s1))
-                    {
-                        dernierSecteur.Temps = CalculerTemps(tempsAComparer: dernierSecteur.DatePassage);
-                        dernierTour.Secteurs.Add(CreerSecteur(numSecteurACreer: 2));
-                    }
-                    break;
-                case 2:
-                    if (EstSecteurDepasse(trace, s2))
-                    {
-                        dernierSecteur.Temps = CalculerTemps(tempsAComparer: dernierSecteur.DatePassage);
-                        dernierTour.Secteurs.Add(CreerSecteur(numSecteurACreer: 3));
-                    }
-                    break;
-                case 3:
-                    if (EstSecteurDepasse(trace, s3))
-                    {
-                        dernierSecteur.Temps = CalculerTemps(tempsAComparer: dernierSecteur.DatePassage);
-                        dernierTour.Temps = CalculerTempsAuTour(dernierTour.Secteurs);
-                        tours.Add(CreerNouveauTour(dernierTour.NumTour));
-                    }
-                    break;
-                default:
-                    break;
+                // Accélération forte
+                couleur = "#008000"; // Vert foncé
             }
-        }
-
-        private static string CalculerTempsAuTour(List<Secteur> secteurs)
-        {
-            TimeSpan totalTime = TimeSpan.Zero;
-
-            foreach (var temps in secteurs.Select(x => x.Temps))
+            else if (acceleration >= 3)
             {
-                totalTime += TimeSpan.ParseExact(temps, "m':'ss'.'fff", CultureInfo.InvariantCulture);
+                // Accélération moyenne
+                couleur = "#00FF00"; // Vert clair
             }
-
-            Console.WriteLine($"Temps calculé: {string.Format("{0}:{1:00}.{2:000}", (int)totalTime.TotalMinutes, totalTime.Seconds, totalTime.Milliseconds)}");
-
-            return string.Format("{0}:{1:00}.{2:000}", (int)totalTime.TotalMinutes, totalTime.Seconds, totalTime.Milliseconds);
-        }
-
-        private static bool EstSecteurDepasse(Trace trace, Zone zone)
-        {
-            if (trace.Longitude >= zone.Coord.Y[0] && trace.Longitude <= zone.Coord.Y[1])
+            else if (acceleration <= -5)
             {
-                if ((zone.Sens == 1 && trace.Latitude >= zone.Coord.X) || (zone.Sens == -1 && trace.Latitude <= zone.Coord.X))
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                // Freinage fort
+                couleur = "#FF0000"; // Rouge foncé
+            }
+            else if (acceleration <= -3)
+            {
+                // Freinage moyen
+                couleur = "#FFA500"; // Orange
             }
             else
             {
-                return false;
+                // La vitesse est stabilisée
+                couleur = "#FFFFFF";
             }
-                   
+
+            return couleur;
         }
 
-        private static Secteur CreerSecteur(int numSecteurACreer)
-		{
-			return new()
-			{
-				DatePassage = DateTime.Now,
-				NumSecteur = numSecteurACreer
-			};
+        /// <summary>
+        /// Permet d'activer ou de désactiver l'envoi de données d'un pilote à distance.
+        /// </summary>
+        /// <returns></returns>
+        private async Task BasculerTelemetrie()
+        {
+            if (!string.IsNullOrEmpty(_pilote.Id))
+            {
+                var pilote = _pilotes.First(x => x.Id == _pilote.Id);
+                await _hubConnection!.InvokeAsync("BasculerTelemetrie", pilote.Id, pilote.SignalrId, !pilote.EstTelemetrieActivee);
+                pilote.EstTelemetrieActivee = !pilote.EstTelemetrieActivee;
+                if (pilote.EstTelemetrieActivee)
+                {
+                    _etatTelemetrie = "Arrêter";
+                    _classBtn = "btn-danger";
+                }
+                else
+                {
+                    _etatTelemetrie = "Démarrer";
+                    _classBtn = "btn-primary";
+                }
+            }
         }
 
-		public async ValueTask DisposeAsync()
-		{
-			if (hubConnection is not null)
-			{
-				await hubConnection.DisposeAsync();
-			}
-		}
-	}
+        protected virtual async Task Dispose(bool disposing)
+        {
+            if (_isDisposed) return;
+
+            if (disposing)
+            {
+                if (_hubConnection is not null)
+                {
+                    await _hubConnection.DisposeAsync();
+                }
+                await DisposeAsync();
+            }
+
+            _isDisposed = true;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+    }
 }
 

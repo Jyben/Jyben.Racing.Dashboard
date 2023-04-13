@@ -1,14 +1,10 @@
-﻿using ProjNet.CoordinateSystems;
-using ProjNet.CoordinateSystems.Transformations;
-using ProjNet;
+﻿
 using System.Drawing;
 
 namespace Jyben.Racing.Dashboard.Client.Helpers
 {
     public class GpsToPixelConverter
     {
-        private double _canvasWidth; // Largeur du canevas en pixels
-        private double _canvasHeight; // Hauteur du canevas en pixels
         private double _leftLongitude; // Longitude du coin supérieur gauche du canevas
         private double _topLatitude; // Latitude du coin supérieur gauche du canevas
         private double _rightLongitude; // Longitude du coin inférieur droit du canevas
@@ -16,14 +12,11 @@ namespace Jyben.Racing.Dashboard.Client.Helpers
         private double _pixelsPerDegreeLongitude; // Pixels par degré de longitude
         private double _pixelsPerDegreeLatitude; // Pixels par degré de latitude
 
-        private ICoordinateTransformation _coordTransform;
 
         public GpsToPixelConverter(double canvasWidth, double canvasHeight,
             double leftLongitude, double topLatitude,
             double rightLongitude, double bottomLatitude)
         {
-            _canvasWidth = canvasWidth;
-            _canvasHeight = canvasHeight;
             _leftLongitude = leftLongitude;
             _topLatitude = topLatitude;
             _rightLongitude = rightLongitude;

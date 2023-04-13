@@ -1,0 +1,106 @@
+{
+  "circuits": [
+    {
+      "nom": "cik",
+      "image": "img/cik.png",
+      "canevas": {
+        "width": 400,
+        "height": 600,
+        "top-left": {
+          "longitude": 0.210903,
+          "latitude": 47.943942
+        },
+        "bottom-right": {
+          "longitude": 0.213743,
+          "latitude": 47.941083
+        }
+      },
+      "zones": [
+        {
+          "secteur": 3,
+          "coord": {
+            "x": 47.942678,
+            "y": [
+              0.211083,
+              0.211438
+            ]
+          },
+          "sens": -1
+        },
+        {
+          "secteur": 2,
+          "coord": {
+            "x": 47.941169,
+            "y": [
+              0.213334,
+              0.213747
+            ]
+          },
+          "sens": 1
+        },
+        {
+          "secteur": 1,
+          "coord": {
+            "x": 47.943115,
+            "y": [
+              0.212701,
+              0.212981
+            ]
+          },
+          "sens": -1
+        }
+      ]
+    },
+    {
+      "nom": "test",
+      "image": "img/test.png",
+      "canevas": {
+        "width": 424,
+        "height": 650,
+        "top-left": {
+          "longitude": 1.536471,
+          "latitude": 47.245767
+        },
+        "bottom-right": {
+          "longitude": 1.532845,
+          "latitude": 47.241984
+        }
+      },
+      "zones": [
+        {
+          "secteur": 3,
+          "coord": {
+            "x": 47.242683,
+            "y": [
+              1.533911,
+              1.553911
+            ]
+          },
+          "sens": -1
+        },
+        {
+          "secteur": 2,
+          "coord": {
+            "x": 47.242683,
+            "y": [
+              1.533911,
+              1.553911
+            ]
+          },
+          "sens": 1
+        },
+        {
+          "secteur": 1,
+          "coord": {
+            "x": 47.242683,
+            "y": [
+              1.533911,
+              1.553911
+            ]
+          },
+          "sens": -1
+        }
+      ]
+    }
+  ]
+}

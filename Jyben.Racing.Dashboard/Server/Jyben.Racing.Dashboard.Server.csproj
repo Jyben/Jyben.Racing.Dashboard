@@ -12,6 +12,7 @@
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'http' " />
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="7.0.4" />
+    <PackageReference Include="MongoDB.Driver" Version="2.19.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,4 +21,20 @@
   </ItemGroup>
 
 
+  <ItemGroup>
+    <None Remove="Services\" />
+    <None Remove="Services\Impl\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Services\" />
+    <Folder Include="Services\Impl\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Remove="circuits.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="circuits.json">
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 </Project>
